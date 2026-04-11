@@ -1,93 +1,260 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-
-import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/format";
-import { buildCapitalGainLots, summarizeCapitalGains, type InvestmentPlan, type InvestmentTransaction } from "@/lib/planning";
-import { DataPill, EmptyNotice, MetricTile, PageHero, SurfacePanel } from "@/components/dashboard-surface";
-
-const supabase = createClient();
+import { useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function TransactionsPage() {
-  const [investments, setInvestments] = useState<InvestmentPlan[]>([]);
-  const [transactions, setTransactions] = useState<InvestmentTransaction[]>([]);
-  const [form, setForm] = useState({ investmentPlanId: "", transactionType: "BUY", amount: "", nav: "", units: "", transactionDate: new Date().toISOString().slice(0, 10), status: "Completed", notes: "" });
-  const [message, setMessage] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState([]);
 
-  async function loadData() {
-    const [plans, txns] = await Promise.all([
-      supabase.from("investment_plans").select("*").eq("is_deleted", false).order("created_at", { ascending: false }),
-      supabase.from("investment_transactions").select("*").order("transaction_date", { ascending: false }),
-    ]);
-    setInvestments((plans.data as InvestmentPlan[]) ?? []);
-    setTransactions((txns.data as InvestmentTransaction[]) ?? []);
-  }
+  const [form, setForm] = useState({
+    investment: "Standalone transaction",
+    type: "BUY",
+    status: "Completed",
+    amount: "",
+    nav: "",
+    units: "",
+    date: "",
+  });
 
-  useEffect(() => { queueMicrotask(() => { void loadData(); }); }, []);
+  const [filter, setFilter] = useState("ALL");
+  const [sortOrder, setSortOrder] = useState("latest");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // ✅ ADD TRANSACTION
+  const handleAdd = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const amount = Number(form.amount);
-    const nav = form.nav ? Number(form.nav) : null;
-    const units = form.units ? Number(form.units) : nav && nav > 0 ? amount / nav : null;
-
-    const { error } = await supabase.from("investment_transactions").insert({
-      user_id: user.id,
-      investment_plan_id: form.investmentPlanId || null,
-      transaction_type: form.transactionType,
-      amount,
-      nav,
-      units,
-      transaction_date: form.transactionDate,
-      status: form.status,
-      notes: form.notes || null,
-    });
-
-    setMessage(error ? error.message : "Transaction saved.");
-    if (!error) {
-      setForm((current) => ({ ...current, amount: "", nav: "", units: "", notes: "" }));
-      void loadData();
+  
+    if (!form.amount || !form.nav) {
+      alert("Enter amount & NAV");
+      return;
     }
-  }
 
-  const gainSummary = useMemo(() => summarizeCapitalGains(buildCapitalGainLots(transactions)), [transactions]);
+    const units =
+      form.units || (form.amount / form.nav).toFixed(2);
+
+    const newTx = {
+      user_id: user?.id || null,
+      transaction_type: form.type,
+      amount: Number(form.amount),
+      nav: Number(form.nav),
+      units: Number(units),
+      transaction_date: form.date || new Date().toISOString().split("T")[0],
+      status: form.status,
+    };
+    const { data, error } = await 
+    supabase.from("investment_transactions").insert([newTx]);
+    if (error) {
+      console.log(error);
+      alert(error.message);
+      return;
+    }
+    setTransactions([...transactions, {...newTx, id: Date.now() }]);
+
+    // reset form
+    setForm({
+      investment: "Standalone transaction",
+      type: "BUY",
+      status: "Completed",
+      amount: "",
+      nav: "",
+      units: "",
+      date: "",
+    });
+  };
+
+  // ✅ FILTER
+  const filteredTransactions =
+    filter === "ALL"
+      ? transactions
+      : transactions.filter((t) => t.type === filter);
+
+  // ✅ SORT
+  const sortedTransactions = [...filteredTransactions].sort(
+    (a, b) => {
+      if (sortOrder === "latest") {
+        return (
+          new Date(b.transaction_date) -
+          new Date(a.transaction_date)
+        );
+      } else {
+        return (
+          new Date(a.transaction_date) -
+          new Date(b.transaction_date)
+        );
+      }
+    }
+  );
 
   return (
-    <section className="space-y-6">
-      <PageHero eyebrow="Transactions" title="Record and review portfolio actions" description="Buys, sells, and switches now sit inside dedicated WealthWise form and ledger sections." />
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricTile label="Transactions" value={String(transactions.length)} />
-        <MetricTile label="STCG" value={formatCurrency(gainSummary.stcg)} />
-        <MetricTile label="LTCG" value={formatCurrency(gainSummary.ltcg)} />
+    <div className="p-6 text-white">
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+      <p className="text-green-400 text-xs tracking-widest font-semibold">TRANSACTIONS</p>
+        <h1 className="text-3xl font-bold text-white mt-2">
+          Record and review portfolio actions
+        </h1>
+        <p className="text-gray-400 mt-2">
+          Buys, sells, and switches now sit inside dedicated form and ledger sections.
+        </p>
       </div>
-      <SurfacePanel title="Add transaction" subtitle="Record buys, sells, and switches with FIFO-ready details.">
-        <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
-          <SelectField label="Investment" value={form.investmentPlanId} options={[{ value: "", label: "Standalone transaction" }, ...investments.map((item) => ({ value: item.id, label: item.fund_name }))]} onChange={(value) => setForm((current) => ({ ...current, investmentPlanId: value }))} />
-          <SelectField label="Type" value={form.transactionType} options={[{ value: "BUY", label: "BUY" }, { value: "SELL", label: "SELL" }, { value: "SWITCH", label: "SWITCH" }]} onChange={(value) => setForm((current) => ({ ...current, transactionType: value }))} />
-          <SelectField label="Status" value={form.status} options={[{ value: "Completed", label: "Completed" }, { value: "Scheduled", label: "Scheduled" }, { value: "Pending", label: "Pending" }]} onChange={(value) => setForm((current) => ({ ...current, status: value }))} />
-          <Field label="Amount" type="number" value={form.amount} onChange={(value) => setForm((current) => ({ ...current, amount: value }))} />
-          <Field label="NAV" type="number" value={form.nav} onChange={(value) => setForm((current) => ({ ...current, nav: value }))} />
-          <Field label="Units" type="number" value={form.units} onChange={(value) => setForm((current) => ({ ...current, units: value }))} />
-          <Field label="Transaction date" type="date" value={form.transactionDate} onChange={(value) => setForm((current) => ({ ...current, transactionDate: value }))} />
-          <div className="md:col-span-2"><label className="mb-2 block text-sm font-medium text-white/72">Notes</label><input value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="ww-auth-input" /></div>
-          <div className="md:col-span-3 flex items-center gap-3"><button type="submit" className="rounded-full bg-[#b4ff45] px-5 py-3 text-sm font-semibold text-[#062415]">Save transaction</button>{message ? <EmptyNotice message={message} tone="success" /> : null}</div>
-        </form>
-      </SurfacePanel>
-      <SurfacePanel title="Transaction log" subtitle="Every transaction contributes to reporting and tax calculation.">
-        <div className="space-y-4">
-          {transactions.length === 0 ? <EmptyNotice message="No transactions recorded yet." /> : null}
-          {transactions.map((item) => <div key={item.id} className="grid gap-3 rounded-[26px] border border-white/8 bg-[#071510] p-5 md:grid-cols-6"><DataPill label="Type" value={item.transaction_type} /><DataPill label="Amount" value={formatCurrency(item.amount)} /><DataPill label="NAV" value={item.nav ? item.nav.toFixed(4) : "-"} /><DataPill label="Units" value={item.units ? item.units.toFixed(4) : "-"} /><DataPill label="Date" value={formatDate(item.transaction_date)} /><DataPill label="Status" value={item.status} /></div>)}
+
+      {/* 🔥 STATS */}
+      <div className="flex gap-4 mb-6">
+        <div className="bg-gray-900 p-4 rounded-xl w-full">
+          <p>Transactions</p>
+          <h2 className="text-xl">{transactions.length}</h2>
         </div>
-      </SurfacePanel>
-    </section>
+
+        <div className="bg-gray-900 p-4 rounded-xl w-full">
+          <p>STCG</p>
+          <h2>₹0</h2>
+        </div>
+
+        <div className="bg-gray-900 p-4 rounded-xl w-full">
+          <p>LTCG</p>
+          <h2>₹0</h2>
+        </div>
+      </div>
+
+      {/* 🔥 FILTER */}
+      <div className="flex gap-4 mb-6">
+        <select
+          className="bg-gray-800 p-2 rounded"
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="ALL">All</option>
+          <option value="BUY">Buy</option>
+          <option value="SELL">Sell</option>
+        </select>
+
+        <select
+          className="bg-gray-800 p-2 rounded"
+          onChange={(e) => setSortOrder(e.target.value)}
+        >
+          <option value="latest">Latest</option>
+          <option value="oldest">Oldest</option>
+        </select>
+      </div>
+
+      {/* 🔥 ADD TRANSACTION */}
+      <div className="bg-gray-900 p-6 rounded-xl mb-8">
+        <h2 className="text-lg mb-4">Add transaction</h2>
+
+        {/* ROW 1 */}
+        <div className="flex gap-4 mb-4">
+          <select
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.investment}
+            onChange={(e) =>
+              setForm({ ...form, investment: e.target.value })
+            }
+          >
+            <option>Standalone transaction</option>
+          </select>
+
+          <select
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.type}
+            onChange={(e) =>
+              setForm({ ...form, type: e.target.value })
+            }
+          >
+            <option>BUY</option>
+            <option>SELL</option>
+          </select>
+
+          <select
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.status}
+            onChange={(e) =>
+              setForm({ ...form, status: e.target.value })
+            }
+          >
+            <option>Completed</option>
+            <option>Pending</option>
+          </select>
+        </div>
+
+        {/* ROW 2 */}
+        <div className="flex gap-4 mb-4">
+          <input
+            placeholder="Amount"
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.amount}
+            onChange={(e) =>
+              setForm({ ...form, amount: e.target.value })
+            }
+          />
+
+          <input
+            placeholder="NAV"
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.nav}
+            onChange={(e) =>
+              setForm({ ...form, nav: e.target.value })
+            }
+          />
+
+          <input
+            placeholder="Units"
+            className="bg-gray-800 p-2 rounded w-full"
+            value={form.units}
+            onChange={(e) =>
+              setForm({ ...form, units: e.target.value })
+            }
+          />
+        </div>
+
+        {/* DATE */}
+        <div className="mb-4">
+          <input
+            type="date"
+            className="bg-gray-800 p-2 rounded"
+            value={form.date}
+            onChange={(e) =>
+              setForm({ ...form, date: e.target.value })
+            }
+          />
+        </div>
+
+        <button
+          onClick={handleAdd}
+          className="bg-lime-400 text-black px-6 py-2 rounded-full"
+        >
+          Save transaction
+        </button>
+      </div>
+
+      {/* 🔥 TRANSACTION LOG */}
+      <div className="bg-gray-900 p-6 rounded-xl">
+        <h2 className="mb-4">Transaction log</h2>
+
+        {/* HEADER */}
+        <div className="flex font-semibold border-b pb-2">
+          <div className="w-1/6">TRANSACTION_Type</div>
+          <div className="w-1/6">Amount</div>
+          <div className="w-1/6">NAV</div>
+          <div className="w-1/6">Units</div>
+          <div className="w-1/6">Date</div>
+          <div className="w-1/6">Status</div>
+        </div>
+
+        {/* DATA */}
+        {sortedTransactions.map((item) => (
+          <div
+            key={item.id}
+            className="flex border-b py-2 text-sm"
+          >
+            <div className="w-1/6">{item.transaction_type}</div>
+            <div className="w-1/6">₹{item.amount}</div>
+            <div className="w-1/6">{item.nav}</div>
+            <div className="w-1/6">{item.units}</div>
+            <div className="w-1/6">{item.transaction_date}</div>
+            <div className="w-1/6">{item.status}</div>
+               </div>
+          
+        ))}
+      </div>
+    </div>
   );
 }
-
-function Field({ label, type = "text", value, onChange }: { label: string; type?: string; value: string; onChange: (value: string) => void; }) { return <div><label className="mb-2 block text-sm font-medium text-white/72">{label}</label><input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="ww-auth-input" /></div>; }
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void; }) { return <div><label className="mb-2 block text-sm font-medium text-white/72">{label}</label><select value={value} onChange={(event) => onChange(event.target.value)} className="ww-auth-input">{options.map((option) => <option key={option.value || option.label} value={option.value}>{option.label}</option>)}</select></div>; }
