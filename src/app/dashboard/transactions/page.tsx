@@ -31,7 +31,7 @@ export default function TransactionsPage() {
     }
 
     const units =
-      form.units || (form.amount / form.nav).toFixed(2);
+      form.units || (Number(form.amount) / Number(form.nav)).toFixed(2);
 
     const newTx = {
       user_id: user?.id || null,
