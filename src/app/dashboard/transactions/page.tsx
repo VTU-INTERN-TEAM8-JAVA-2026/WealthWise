@@ -2,9 +2,19 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+type Transaction = {
+  id: number;
+  user_id: string | null;
+  transaction_type: string;
+  amount: number;
+  nav: number;
+  units: number;
+  transaction_date: string;
+  status: string;
+};
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   const [form, setForm] = useState({
     investment: "Standalone transaction",
@@ -30,14 +40,18 @@ export default function TransactionsPage() {
       return;
     }
 
+    const amount = Number(form.amount) || 0;
+    const nav = Number(form.nav) || 1;
+
     const units =
-      form.units || (Number(form.amount) / Number(form.nav)).toFixed(2);
+      form.units ||
+    (amount && nav ? (amount / nav).toFixed(2) : "0");
 
     const newTx = {
       user_id: user?.id || null,
       transaction_type: form.type,
-      amount: Number(form.amount),
-      nav: Number(form.nav),
+      amount: amount,
+      nav: nav,
       units: Number(units),
       transaction_date: form.date || new Date().toISOString().split("T")[0],
       status: form.status,
@@ -67,21 +81,19 @@ export default function TransactionsPage() {
   const filteredTransactions =
     filter === "ALL"
       ? transactions
-      : transactions.filter((t) => t.type === filter);
+      : transactions.filter((t) => t.transaction_type === filter);
 
   // ✅ SORT
   const sortedTransactions = [...filteredTransactions].sort(
     (a, b) => {
       if (sortOrder === "latest") {
-        return (
-          new Date(b.transaction_date) -
-          new Date(a.transaction_date)
-        );
+        return new Date(b.transaction_date).getTime() - 
+         new Date(a.transaction_date).getTime();
+        
       } else {
-        return (
-          new Date(a.transaction_date) -
-          new Date(b.transaction_date)
-        );
+        return new Date(a.transaction_date).getTime() - 
+        new Date(b.transaction_date).getTime();
+        
       }
     }
   );
