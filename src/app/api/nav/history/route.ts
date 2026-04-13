@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const points: NavPoint[] = data.slice(0, 365).reverse().map((item: { date: string; nav: string }) => ({
     date: item.date,
     nav: Number(item.nav),
-  })).filter((item) => Number.isFinite(item.nav));
+  })).filter((item: any) => Number.isFinite(item.nav));
 
   return NextResponse.json({
     meta: payload?.meta ?? null,
