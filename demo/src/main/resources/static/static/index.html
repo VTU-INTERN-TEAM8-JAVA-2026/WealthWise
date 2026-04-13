@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Portfolio Dashboard</title>
+</head>
+<body>
+
+<h1>📊 Portfolio Dashboard</h1>
+
+<button onclick="getCagr()">Get CAGR</button>
+<p id="cagr"></p>
+
+<button onclick="getXirr()">Get XIRR</button>
+<p id="xirr"></p>
+
+<button onclick="getDayPnL()">Day P&L</button>
+<p id="daypnl"></p>
+
+<button onclick="getAllocation()">Allocation</button>
+<pre id="allocation"></pre>
+
+<script>
+
+    function getCagr() {
+        fetch('/portfolio/cagr')
+            .then(res => res.text())
+            .then(data => document.getElementById('cagr').innerText = data + "%");
+    }
+
+    function getXirr() {
+        fetch('/portfolio/xirr')
+            .then(res => res.text())
+            .then(data => document.getElementById('xirr').innerText = data + "%");
+    }
+
+    function getDayPnL() {
+        fetch('/portfolio/day-pnl')
+            .then(res => res.text())
+            .then(data => document.getElementById('daypnl').innerText = data);
+    }
+
+    function getAllocation() {
+        fetch('/portfolio/allocation')
+            .then(res => res.json())
+            .then(data => document.getElementById('allocation').innerText = JSON.stringify(data, null, 2));
+    }
+
+</script>
+
+</body>
+</html>
