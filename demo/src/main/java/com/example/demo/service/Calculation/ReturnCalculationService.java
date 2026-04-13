@@ -37,4 +37,12 @@ public class ReturnCalculationService{
                 .multiply(BigDecimal.valueOf(100))
                 .setScale(4, RoundingMode.HALF_UP);
     }
+
+    public double calculateReturn() {
+        System.out.println("Calculating return...");
+        return 5000;
+    }
+    public double calculateXirr() {
+        return 12.5;
+    }
 }

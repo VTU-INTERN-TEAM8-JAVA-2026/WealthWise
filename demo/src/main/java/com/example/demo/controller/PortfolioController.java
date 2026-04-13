@@ -5,7 +5,7 @@ import com.example.demo.repository.InvestmentRepository;
 import com.example.demo.service.portfolio.PortfolioService;
 import org.springframework.web.bind.annotation.*;
 import com.example.demo.model.PortfolioRequest;
-
+import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -26,24 +26,19 @@ public class PortfolioController {
         this.repo = repo;
     }
 
-    @GetMapping("/value")
-    public BigDecimal getValue() {
-        return service.calculatePortfolioValue();
+    @PostMapping("/values")
+    public BigDecimal getValue(@RequestBody List<Investment> investments) {
+        return service.calculatePortfolioValue(investments);
     }
 
-    @GetMapping("/invested")
-    public BigDecimal getInvested() {
-        return service.calculateTotalInvested();
+    @PostMapping("/invested")
+    public BigDecimal getInvested(@RequestBody List<Investment> investments) {
+        return service.calculateTotalInvested(investments);
     }
 
-    @GetMapping("/cagr")
-    public BigDecimal getCagr() {
-        return service.calculatePortfolioCagr();
-    }
-
-    @GetMapping("/xirr")
-    public BigDecimal getXirr() {
-        return service.calculatePortfolioXirr();
+    @PostMapping("/cagr")
+    public BigDecimal getCagr(@RequestBody List<Investment> investments) {
+        return service.calculatePortfolioCagr(investments);
     }
 
     @GetMapping("/day-pnl")
@@ -76,14 +71,13 @@ public class PortfolioController {
     public Investment addInvestment(@RequestBody Investment inv) {
         return repo.save(inv);
     }
-    @GetMapping("/pnl")
-    public BigDecimal getPnL() {
-        return service.calculateProfitLoss();
+    @PostMapping("/pnl")
+    public BigDecimal getPnL(@RequestBody List<Investment> investments) {
+        return service.calculateProfitLoss(investments);
     }
-
-    @GetMapping("/returns")
-    public BigDecimal getAbsoluteReturn() {
-        return service.calculateAbsoluteReturn();
+    @PostMapping("/returns")
+    public BigDecimal getAbsoluteReturn(@RequestBody List<Investment> investments) {
+        return service.calculateAbsoluteReturn(investments);
     }
     @GetMapping("/all")
     public List<Investment> getAll() {

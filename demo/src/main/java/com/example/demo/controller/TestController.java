@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class TestController {
 
-    @GetMapping("/test")
+    @GetMapping("/test2")
     public String test() {
         return "Backend is working perfectly!";
     }

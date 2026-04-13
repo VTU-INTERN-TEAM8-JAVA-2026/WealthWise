@@ -1,11 +1,10 @@
 package com.example.demo.model;
 
 import jakarta.persistence.*;
-import org.antlr.v4.runtime.misc.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.math.BigDecimal;
 
 @Entity
 public class Investment {
@@ -13,78 +12,66 @@ public class Investment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @NotNull
+
     private String fundName;
 
     @Positive
-
     private BigDecimal units;
+
+    private String symbol;
+    private double quantity;
+    private double price;  // ✅ Added getter/setter below
 
     private BigDecimal nav;
     private BigDecimal amount;
     private BigDecimal previousNav;
     private LocalDate date;
 
-
-    // ✅ GETTERS & SETTERS
-    public BigDecimal getAmount() {
-        return amount;
+    // ✅ 1. Default constructor (REQUIRED for JPA/Spring)
+    public Investment() {
     }
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
-    public Long getId() {
-        return id;
-    }
-
-    public String getFundName() {
-        return fundName;
+    // ✅ 2. Parameter constructor (for your controller)
+    public Investment(String symbol, double quantity, double price) {
+        this.symbol = symbol;
+        this.quantity = quantity;
+        this.price = price;
     }
 
-    public void setFundName(String fundName) {
-        this.fundName = fundName;
+    // ✅ 3. MISSING: price getter/setter
+    public double getPrice() {
+        return price;
     }
 
-
-
-
-
-    public BigDecimal getUnits() {
-        return units;
+    public void setPrice(double price) {
+        this.price = price;
     }
 
-    public void setUnits(BigDecimal units) {
-        this.units = units;
-    }
+    // ✅ All other getters/setters (you have most)...
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public BigDecimal getNav() {
-        return nav;
-    }
+    public String getFundName() { return fundName; }
+    public void setFundName(String fundName) { this.fundName = fundName; }
 
-    public void setNav(BigDecimal nav) {
-        this.nav = nav;
-    }
+    public BigDecimal getUnits() { return units; }
+    public void setUnits(BigDecimal units) { this.units = units; }
 
-    public BigDecimal getPreviousNav() {
-        return previousNav;
-    }
+    public String getSymbol() { return symbol; }
+    public void setSymbol(String symbol) { this.symbol = symbol; }
 
-    public void setPreviousNav(BigDecimal previousNav) {
-        this.previousNav = previousNav;
-    }
+    public double getQuantity() { return quantity; }
+    public void setQuantity(double quantity) { this.quantity = quantity; }
 
-    public LocalDate getDate() {
-        return date;
-    }
+    public BigDecimal getNav() { return nav; }
+    public void setNav(BigDecimal nav) { this.nav = nav; }
 
-    public void setDate(LocalDate date) {
-        this.date = date;
-    }
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
 
+    public BigDecimal getPreviousNav() { return previousNav; }
+    public void setPreviousNav(BigDecimal previousNav) { this.previousNav = previousNav; }
 
-
-
-
-
+    public LocalDate getDate() { return date; }
+    public void setDate(LocalDate date) { this.date = date; }
 }
