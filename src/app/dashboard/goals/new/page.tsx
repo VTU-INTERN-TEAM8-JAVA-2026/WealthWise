@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { calculateMonthlyNeed } from "@/lib/planning";
 import { EmptyNotice, GhostButton, PageHero, SurfacePanel } from "@/components/dashboard-surface";
+import { createGoal, ApiError } from "@/lib/api/goals";
 
 export default function NewGoalPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function NewGoalPage() {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+
+    /* ---- auth guard ---- */
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -26,6 +29,8 @@ export default function NewGoalPage() {
       setSubmitting(false);
       return;
     }
+
+    /* ---- validate inputs ---- */
     const targetAmount = Number(form.targetAmount);
     const investedAmount = Number(form.investedAmount || 0);
     const expectedReturn = Number(form.expectedReturn || 0);
@@ -35,17 +40,46 @@ export default function NewGoalPage() {
       setSubmitting(false);
       return;
     }
+
+    /* ---- compute monthly need ---- */
     const inflatedTarget = targetAmount * Math.pow(1 + inflationRate / 100, Math.max(new Date(form.targetDate).getFullYear() - new Date().getFullYear(), 0));
     const monthlyNeed = calculateMonthlyNeed(inflatedTarget, investedAmount, form.targetDate, expectedReturn);
-    const { data, error } = await supabase.from("financial_goals").insert({ user_id: user.id, name: form.goalName, category: form.category, target_amount: targetAmount, invested_amount: investedAmount, target_date: form.targetDate, priority: form.priority, expected_return: expectedReturn, inflation_rate: inflationRate, monthly_need: monthlyNeed, status: "Active" }).select("id").single();
-    if (error) {
-      setError(error.message);
+
+    /* ---- send to Spring Boot backend ---- */
+    try {
+      await createGoal({
+        userId: user.id,
+        name: form.goalName,
+        category: form.category,
+        targetAmount,
+        investedAmount,
+        targetDate: form.targetDate, // already YYYY-MM-DD from <input type="date" />
+        priority: form.priority,
+        status: "Active",
+        inflationRate,
+        expectedReturn,
+        monthlyNeed,
+      });
+
+      /* ---- create a Supabase notification alert ---- */
+      await supabase.from("user_alerts").insert({
+        user_id: user.id,
+        title: "Goal created",
+        description: `${form.goalName} was added under ${form.category}. Suggested monthly contribution is Rs ${Math.round(monthlyNeed).toLocaleString("en-IN")}.`,
+        severity: monthlyNeed > 20000 ? "Action" : "Info",
+        source_type: "financial_goal",
+      });
+
       setSubmitting(false);
-      return;
+      router.push("/dashboard/goals");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setError(`Validation error: ${err.message}`);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to create goal.");
+      }
+      setSubmitting(false);
     }
-    await supabase.from("user_alerts").insert({ user_id: user.id, title: "Goal created", description: `${form.goalName} was added under ${form.category}. Suggested monthly contribution is Rs ${Math.round(monthlyNeed).toLocaleString("en-IN")}.`, severity: monthlyNeed > 20000 ? "Action" : "Info", source_type: "financial_goal", source_id: data.id });
-    setSubmitting(false);
-    router.push("/dashboard/goals");
   }
 
   return (

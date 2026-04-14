@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -7,9 +7,29 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
 import { getGoalProgress, type FinancialGoal, type UserAlert } from "@/lib/planning";
 import { DataPill, EmptyNotice, PageHero, SurfacePanel } from "@/components/dashboard-surface";
+import { getGoals, type GoalResponse } from "@/lib/api/goals";
 
 const supabase = createClient();
 const milestones = [25, 50, 75, 100];
+
+/** Convert backend camelCase response → frontend snake_case FinancialGoal shape */
+function toFinancialGoal(g: GoalResponse): FinancialGoal {
+  return {
+    id: g.id,
+    user_id: g.userId,
+    name: g.name,
+    target_amount: g.targetAmount,
+    invested_amount: g.investedAmount,
+    target_date: g.targetDate,
+    category: g.category,
+    priority: g.priority as FinancialGoal["priority"],
+    status: g.status as FinancialGoal["status"],
+    inflation_rate: g.inflationRate,
+    expected_return: g.expectedReturn,
+    monthly_need: g.monthlyNeed,
+    created_at: g.createdAt,
+  };
+}
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
@@ -39,7 +59,8 @@ export default function GoalsPage() {
   }
 
   useEffect(() => {
-    queueMicrotask(async () => {
+    async function loadGoals() {
+      /* ---- auth guard ---- */
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -48,23 +69,22 @@ export default function GoalsPage() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase.from("financial_goals").select("*").order("created_at", { ascending: false });
-      if (error) setError(error.message);
-      else {
-        const rows = (data as FinancialGoal[]) ?? [];
+
+      /* ---- fetch from Spring Boot backend ---- */
+      try {
+        const data = await getGoals(user.id);
+        const rows = data.map(toFinancialGoal);
         setGoals(rows);
         await syncMilestoneAlerts(rows);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load goals.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-  }, []);
+    }
 
-  async function markAchieved(id: string) {
-    await supabase.from("financial_goals").update({ status: "Achieved" }).eq("id", id);
-    const { data, error } = await supabase.from("financial_goals").select("*").order("created_at", { ascending: false });
-    if (error) setError(error.message);
-    else setGoals((data as FinancialGoal[]) ?? []);
-  }
+    loadGoals();
+  }, []);
 
   return (
     <section className="space-y-6">
@@ -78,23 +98,24 @@ export default function GoalsPage() {
         {goals.map((goal) => {
           const progress = getGoalProgress(goal);
           return (
-            <SurfacePanel key={goal.id} className="h-full">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-fuchsia-400/12 px-3 py-1 text-xs font-semibold text-fuchsia-100">{goal.priority}</span>
-                <span className="text-sm text-white/46">{formatDate(goal.target_date)}</span>
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold text-white">{goal.name}</h2>
-              <p className="mt-2 text-sm text-white/56">{goal.category} goal • status {goal.status}</p>
-              <p className="mt-2 text-sm text-white/56">Target corpus {formatCurrency(goal.target_amount)}</p>
-              <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-[#b4ff45]" style={{ width: `${Math.min(progress, 100)}%` }} /></div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <DataPill label="Progress" value={formatPercent(progress)} />
-                <DataPill label="Invested" value={formatCurrency(goal.invested_amount)} />
-                <DataPill label="Monthly need" value={formatCurrency(goal.monthly_need)} />
-                <DataPill label="Inflation" value={`${goal.inflation_rate.toFixed(1)}%`} />
-              </div>
-              {goal.status !== "Achieved" ? <button onClick={() => void markAchieved(goal.id)} className="mt-5 rounded-full border border-fuchsia-300/20 px-4 py-2 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/10">Mark achieved</button> : null}
-            </SurfacePanel>
+            <Link key={goal.id} href={`/dashboard/goals/${goal.id}`} className="block transition hover:scale-[1.015]">
+              <SurfacePanel className="h-full">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-fuchsia-400/12 px-3 py-1 text-xs font-semibold text-fuchsia-100">{goal.priority}</span>
+                  <span className="text-sm text-white/46">{formatDate(goal.target_date)}</span>
+                </div>
+                <h2 className="mt-4 text-2xl font-semibold text-white">{goal.name}</h2>
+                <p className="mt-2 text-sm text-white/56">{goal.category} goal • status {goal.status}</p>
+                <p className="mt-2 text-sm text-white/56">Target corpus {formatCurrency(goal.target_amount)}</p>
+                <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/8"><div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-[#b4ff45]" style={{ width: `${Math.min(progress, 100)}%` }} /></div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <DataPill label="Progress" value={formatPercent(progress)} />
+                  <DataPill label="Invested" value={formatCurrency(goal.invested_amount)} />
+                  <DataPill label="Monthly need" value={formatCurrency(goal.monthly_need)} />
+                  <DataPill label="Inflation" value={`${goal.inflation_rate.toFixed(1)}%`} />
+                </div>
+              </SurfacePanel>
+            </Link>
           );
         })}
       </div>
