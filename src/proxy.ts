@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * Middleware to handle Supabase session refreshing and route protection.
  * It ensures that the user session is kept alive and redirects unauthorized users.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // Initialize Supabase client with cookie handling
