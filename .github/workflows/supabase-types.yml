@@ -1,9 +1,9 @@
-name: Sync Supabase Types
+﻿name: Sync Supabase Types
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Daily at midnight
-  workflow_dispatch: # Allows manual trigger
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   update-types:
@@ -18,6 +18,9 @@ jobs:
 
       - name: Install Supabase CLI
         run: npm install -g supabase
+
+      - name: Ensure output directory exists
+        run: mkdir -p src/types
 
       - name: Generate TypeScript types
         run: supabase gen types typescript --project-id "${{ secrets.SUPABASE_PROJECT_ID }}" > src/types/supabase.ts

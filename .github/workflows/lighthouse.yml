@@ -1,4 +1,4 @@
-name: Lighthouse Audit
+﻿name: Lighthouse Audit
 
 on:
   push:
@@ -24,16 +24,19 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
 
       - name: Run Lighthouse Audit
         uses: treosh/lighthouse-ci-action@v11
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
         with:
           urls: |
             http://localhost:3000/
             http://localhost:3000/login
           serverBaseUrl: "http://localhost:3000"
-          startServerCommand: npm run start
-          uploadArtifacts: true # Save the report as a workflow artifact
-          temporaryPublicStorage: true # Upload to a temporary public URL for easy viewing
+          startServerCommand: npm run start -- --hostname 0.0.0.0 --port 3000
+          uploadArtifacts: true
+          temporaryPublicStorage: true
